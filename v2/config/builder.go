@@ -167,10 +167,9 @@ func setOutbounds(options *option.Options, input *option.Options, opt *HiddifyOp
 				hasPsiphon = true
 			}
 			if !strings.Contains(out.Tag, "§hide§") {
-				if isBlacklistedTag(out.Tag, opt.BlacklistedTags) {
-					continue
+				if !isBlacklistedTag(out.Tag, opt.BlacklistedTags) {
+					tags = append(tags, out.Tag)
 				}
-				tags = append(tags, out.Tag)
 			}
 			// OutboundWARPConfigDetour = OutboundSelectTag
 			out = *patchHiddifyWarpFromConfig(&out, *opt)
@@ -244,10 +243,9 @@ func setOutbounds(options *option.Options, input *option.Options, opt *HiddifyOp
 		}
 
 		if !strings.Contains(out.Tag, "§hide§") {
-			if isBlacklistedTag(out.Tag, opt.BlacklistedTags) {
-				continue
+			if !isBlacklistedTag(out.Tag, opt.BlacklistedTags) {
+				tags = append(tags, out.Tag)
 			}
-			tags = append(tags, out.Tag)
 		}
 
 		endpoints = append(endpoints, *out)
