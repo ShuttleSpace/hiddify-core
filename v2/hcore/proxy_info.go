@@ -114,6 +114,45 @@ func (h *HiddifyInstance) GetAllProxiesInfo(hismap map[string]*adapter.URLTestHi
 		}
 	}
 
+	referencedTags := make(map[string]struct{})
+	for _, it := range box.Outbound().Outbounds() {
+		if group, isGroup := it.(adapter.OutboundGroup); isGroup {
+			for _, itemTag := range group.All() {
+				referencedTags[itemTag] = struct{}{}
+			}
+		}
+	}
+
+	orphanTags := make([]string, 0)
+	for _, it := range box.Endpoint().Endpoints() {
+		tag := it.Tag()
+		if _, referenced := referencedTags[tag]; referenced || strings.Contains(tag, "§hide§") {
+			continue
+		}
+		if isPredefinedOutboundTag(tag) {
+			continue
+		}
+		if info := outbounds_converted[tag]; info == nil || info.IsGroup {
+			continue
+		}
+		orphanTags = append(orphanTags, tag)
+		referencedTags[tag] = struct{}{}
+	}
+	for _, it := range box.Outbound().Outbounds() {
+		tag := it.Tag()
+		if _, referenced := referencedTags[tag]; referenced || strings.Contains(tag, "§hide§") {
+			continue
+		}
+		if isPredefinedOutboundTag(tag) {
+			continue
+		}
+		if info := outbounds_converted[tag]; info == nil || info.IsGroup {
+			continue
+		}
+		orphanTags = append(orphanTags, tag)
+		referencedTags[tag] = struct{}{}
+	}
+
 	var groups OutboundGroupList
 	for _, iGroup := range iGroups {
 		var group OutboundGroup
@@ -147,6 +186,15 @@ func (h *HiddifyInstance) GetAllProxiesInfo(hismap map[string]*adapter.URLTestHi
 			continue
 		}
 
+		if group.Tag == config.OutboundSelectTag {
+			for _, tag := range orphanTags {
+				pinfo := outbounds_converted[tag]
+				pinfo.IsSelected = false
+				pinfo.IsVisible = true
+				group.Items = append(group.Items, pinfo)
+			}
+		}
+
 		groups.Items = append(groups.Items, &group)
 
 		if onlyGroupitems && group.Tag == config.OutboundSelectTag {
@@ -165,6 +213,15 @@ func (h *HiddifyInstance) GetAllProxiesInfo(hismap map[string]*adapter.URLTestHi
 
 func TrimTagName(tag string) string {
 	return strings.Trim(strings.Split(tag, "§")[0], " ")
+}
+
+func isPredefinedOutboundTag(tag string) bool {
+	for _, predefinedTag := range config.PredefinedOutboundTags {
+		if tag == predefinedTag {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *CoreService) OutboundsInfo(req *hcommon.Empty, stream grpc.ServerStreamingServer[OutboundGroupList]) error {

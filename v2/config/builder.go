@@ -167,7 +167,9 @@ func setOutbounds(options *option.Options, input *option.Options, opt *HiddifyOp
 				hasPsiphon = true
 			}
 			if !strings.Contains(out.Tag, "§hide§") {
-				tags = append(tags, out.Tag)
+				if !isBlacklistedTag(out.Tag, opt.BlacklistedTags) {
+					tags = append(tags, out.Tag)
+				}
 			}
 			// OutboundWARPConfigDetour = OutboundSelectTag
 			out = *patchHiddifyWarpFromConfig(&out, *opt)
@@ -241,7 +243,9 @@ func setOutbounds(options *option.Options, input *option.Options, opt *HiddifyOp
 		}
 
 		if !strings.Contains(out.Tag, "§hide§") {
-			tags = append(tags, out.Tag)
+			if !isBlacklistedTag(out.Tag, opt.BlacklistedTags) {
+				tags = append(tags, out.Tag)
+			}
 		}
 
 		endpoints = append(endpoints, *out)
@@ -372,6 +376,16 @@ func isBlockedConnectionTestUrl(d string) bool {
 func contains(slice []string, item string) bool {
 	for _, s := range slice {
 		if s == item {
+			return true
+		}
+	}
+	return false
+}
+
+func isBlacklistedTag(tag string, blacklist []string) bool {
+	cleanTag := strings.TrimSpace(strings.Split(tag, "§")[0])
+	for _, blocked := range blacklist {
+		if strings.EqualFold(cleanTag, strings.TrimSpace(blocked)) {
 			return true
 		}
 	}
