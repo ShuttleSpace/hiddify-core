@@ -98,6 +98,8 @@ windows-amd64: prepare
 		exit 1; \
 	fi
 
+windows-archs: windows-amd64
+
 # 	make webui
 	
 
@@ -128,6 +130,8 @@ build-cronet:
 linux-%:
 	$(MAKE) ARCH=$* build-linux
 
+linux-archs: linux-amd64 linux-arm64 linux-arm linux-386
+
 define load_cronet_env
 set -a; \
 while IFS= read -r line; do \
@@ -141,6 +145,7 @@ endef
 
 build-linux: prepare
 	mkdir -p $(BINDIR)/lib
+	CORE_LIB=$(LIBNAME)-$(ARCH).so; \
 
 	$(load_cronet_env)
 	FINAL_TAGS=$(TAGS); \
@@ -150,18 +155,18 @@ build-linux: prepare
 		FINAL_TAGS="$${FINAL_TAGS},with_purego"; \
 	fi; \
 	echo "FinalTags: $$FINAL_TAGS"; \
-	GOOS=linux GOARCH=$(ARCH) $(GOBUILDLIB) -tags $${FINAL_TAGS} -o $(BINDIR)/lib/$(LIBNAME).so ./platform/desktop ;\
+	GOOS=linux GOARCH=$(ARCH) $(GOBUILDLIB) -tags $${FINAL_TAGS} -o $(BINDIR)/lib/$$CORE_LIB ./platform/desktop ;\
 	
 	echo "Core library built, now building CLI with CGO linking to core library"
 	mkdir lib
-	cp $(BINDIR)/lib/$(LIBNAME).so ./lib/$(LIBNAME).so
+	cp $(BINDIR)/lib/$$CORE_LIB ./lib/$$CORE_LIB
 
-	GOOS=linux GOARCH=$(ARCH) CGO_LDFLAGS="./lib/$(LIBNAME).so -Wl,-rpath,\$$ORIGIN/lib -fuse-ld=lld" $(GOBUILDSRV) -o $(BINDIR)/$(CLINAME) ./cmd/bydll
+	GOOS=linux GOARCH=$(ARCH) CGO_LDFLAGS="./lib/$$CORE_LIB -Wl,-rpath,\$$ORIGIN/lib -fuse-ld=lld" $(GOBUILDSRV) -o $(BINDIR)/$(CLINAME)-$(ARCH) ./cmd/bydll
 	
 	rm -rf ./lib/*.so
-	chmod +x $(BINDIR)/$(CLINAME)
-	if [ ! -f $(BINDIR)/lib/$(LIBNAME).so -o ! -f $(BINDIR)/$(CLINAME) ]; then \
-		echo "Error: $(LIBNAME).so or $(CLINAME) not built"; \
+	chmod +x $(BINDIR)/$(CLINAME)-$(ARCH)
+	if [ ! -f $(BINDIR)/lib/$$CORE_LIB -o ! -f $(BINDIR)/$(CLINAME)-$(ARCH) ]; then \
+		echo "Error: $$CORE_LIB or $(CLINAME)-$(ARCH) not built"; \
 		ls -R $(BINDIR); \
 		exit 1; \
 	fi
@@ -177,9 +182,11 @@ linux-custom: prepare  install_cronet
 	make webui
 
 macos-amd64:
-	env GOOS=darwin GOARCH=amd64 CGO_CFLAGS="-mmacosx-version-min=10.11 -O2" CGO_LDFLAGS="-mmacosx-version-min=10.11 -O2 -lpthread" CGO_ENABLED=1 go build -trimpath -tags $(TAGS),$(MACOS_ADD_TAGS) -buildmode=c-shared -o $(BINDIR)/$(LIBNAME)-amd64.dylib ./platform/desktop
+	env GOOS=darwin GOARCH=amd64 CGO_CFLAGS="-mmacosx-version-min=10.11 -O2" CGO_LDFLAGS="-mmacosx-version-min=10.11 -O2 -lpthread" CGO_ENABLED=1 go build -trimpath -ldflags="$(LDFLAGS)" -tags $(TAGS),$(MACOS_ADD_TAGS) -buildmode=c-shared -o $(BINDIR)/$(LIBNAME)-amd64.dylib ./platform/desktop
 macos-arm64:
-	env GOOS=darwin GOARCH=arm64 CGO_CFLAGS="-mmacosx-version-min=10.11 -O2" CGO_LDFLAGS="-mmacosx-version-min=10.11 -O2 -lpthread" CGO_ENABLED=1 go build -trimpath -tags $(TAGS),$(MACOS_ADD_TAGS) -buildmode=c-shared -o $(BINDIR)/$(LIBNAME)-arm64.dylib ./platform/desktop
+	env GOOS=darwin GOARCH=arm64 CGO_CFLAGS="-mmacosx-version-min=10.11 -O2" CGO_LDFLAGS="-mmacosx-version-min=10.11 -O2 -lpthread" CGO_ENABLED=1 go build -trimpath -ldflags="$(LDFLAGS)" -tags $(TAGS),$(MACOS_ADD_TAGS) -buildmode=c-shared -o $(BINDIR)/$(LIBNAME)-arm64.dylib ./platform/desktop
+
+macos-archs: macos-amd64 macos-arm64
 	
 macos: prepare macos-amd64 macos-arm64 
 	
