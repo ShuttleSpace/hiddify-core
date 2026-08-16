@@ -47,7 +47,21 @@ headers:
 	go build -buildmode=c-archive -o $(BINDIR)/ ./platform/desktop2
 
 android: lib_install
-	ANDROID_NDK_HOME="$(ANDROID_NDK_HOME)" NDK="$(NDK)" CGO_LDFLAGS="-O2 -g -s -w -Wl,-z,max-page-size=16384" gomobile bind -v -androidapi=21 -javapkg=com.hiddify.core -libname=hiddify-core -tags=$(TAGS) -trimpath -ldflags="$(LDFLAGS)" -target=android -gcflags "all=-N -l" -o $(BINDIR)/$(LIBNAME).aar github.com/sagernet/sing-box/experimental/libbox ./platform/mobile
+	ANDROID_NDK_HOME="$(ANDROID_NDK_HOME)" NDK="$(NDK)" CGO_LDFLAGS="-O2 -s -w -Wl,-z,max-page-size=16384" gomobile bind -v -androidapi=21 -javapkg=com.hiddify.core -libname=hiddify-core -tags=$(TAGS) -trimpath -ldflags="$(LDFLAGS)" -target=android -o $(BINDIR)/$(LIBNAME).aar github.com/sagernet/sing-box/experimental/libbox ./platform/mobile
+
+android-arm:
+	ANDROID_NDK_HOME="$(ANDROID_NDK_HOME)" NDK="$(NDK)" CGO_LDFLAGS="-O2 -s -w -Wl,-z,max-page-size=16384" gomobile bind -v -androidapi=21 -javapkg=com.hiddify.core -libname=hiddify-core -tags=$(TAGS) -trimpath -ldflags="$(LDFLAGS)" -target=android/arm -o $(BINDIR)/$(LIBNAME)-arm.aar github.com/sagernet/sing-box/experimental/libbox ./platform/mobile
+
+android-arm64:
+	ANDROID_NDK_HOME="$(ANDROID_NDK_HOME)" NDK="$(NDK)" CGO_LDFLAGS="-O2 -s -w -Wl,-z,max-page-size=16384" gomobile bind -v -androidapi=21 -javapkg=com.hiddify.core -libname=hiddify-core -tags=$(TAGS) -trimpath -ldflags="$(LDFLAGS)" -target=android/arm64 -o $(BINDIR)/$(LIBNAME)-arm64.aar github.com/sagernet/sing-box/experimental/libbox ./platform/mobile
+
+android-amd64:
+	ANDROID_NDK_HOME="$(ANDROID_NDK_HOME)" NDK="$(NDK)" CGO_LDFLAGS="-O2 -s -w -Wl,-z,max-page-size=16384" gomobile bind -v -androidapi=21 -javapkg=com.hiddify.core -libname=hiddify-core -tags=$(TAGS) -trimpath -ldflags="$(LDFLAGS)" -target=android/amd64 -o $(BINDIR)/$(LIBNAME)-amd64.aar github.com/sagernet/sing-box/experimental/libbox ./platform/mobile
+
+android-386:
+	ANDROID_NDK_HOME="$(ANDROID_NDK_HOME)" NDK="$(NDK)" CGO_LDFLAGS="-O2 -s -w -Wl,-z,max-page-size=16384" gomobile bind -v -androidapi=21 -javapkg=com.hiddify.core -libname=hiddify-core -tags=$(TAGS) -trimpath -ldflags="$(LDFLAGS)" -target=android/386 -o $(BINDIR)/$(LIBNAME)-386.aar github.com/sagernet/sing-box/experimental/libbox ./platform/mobile
+
+android-archs: android-arm android-arm64 android-amd64 android-386
 
 ios-full: lib_install
 	gomobile bind -v  -target ios,iossimulator,tvos,tvossimulator,macos -libname=hiddify-core -tags=$(TAGS),$(IOS_ADD_TAGS) -trimpath -ldflags="$(LDFLAGS)" -o $(BINDIR)/$(PRODUCT_NAME).xcframework github.com/sagernet/sing-box/experimental/libbox ./platform/mobile 
@@ -189,4 +203,3 @@ clean:
 release: # Create a new tag for release.	
 	@bash -c '.github/change_version.sh'
 	
-
