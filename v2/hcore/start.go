@@ -18,7 +18,7 @@ import (
 )
 
 func (s *CoreService) Start(ctx context.Context, in *StartRequest) (*CoreInfoResponse, error) {
-	return Start(static.BaseContext, in)
+	return Start(currentBaseContext(), in)
 }
 
 func Start(ctx context.Context, in *StartRequest) (*CoreInfoResponse, error) {
@@ -119,9 +119,10 @@ func StartService(ctx context.Context, in *StartRequest) (coreResponse *CoreInfo
 		}
 		Log(LogLevel_INFO, LogType_CORE, "Current Config is:\n", string(pout))
 	}
-	ctx = libbox.FromContext(ctx, static.globalPlatformInterface)
-	if static.globalPlatformInterface != nil {
-		platformWrapper := libbox.WrapPlatformInterface(static.globalPlatformInterface)
+	platformInterface := currentPlatformInterface()
+	ctx = libbox.FromContext(ctx, platformInterface)
+	if platformInterface != nil {
+		platformWrapper := libbox.WrapPlatformInterface(platformInterface)
 		service.MustRegister[adapter.PlatformInterface](ctx, platformWrapper)
 		// } else {
 		// 	service.MustRegister[adapter.PlatformInterface](ctx, (*adapter.PlatformInterface)nil)
