@@ -20,6 +20,8 @@ GOBUILDLIB=CGO_ENABLED=1 go build -trimpath -ldflags="$(LDFLAGS)" -buildmode=c-s
 GOBUILDSRV=CGO_ENABLED=1 go build -ldflags="$(LDFLAGS)" -trimpath -tags $(TAGS)
 
 CRONET_DIR=./cronet
+ANDROID_NDK_HOME := $(shell ls -d $(ANDROID_HOME)/ndk/* 2>/dev/null | sort -V | tail -1)
+NDK := $(ANDROID_NDK_HOME)
 .PHONY: protos
 protos:
 	go install github.com/pseudomuto/protoc-gen-doc/cmd/protoc-gen-doc@latest
@@ -45,7 +47,7 @@ headers:
 	go build -buildmode=c-archive -o $(BINDIR)/ ./platform/desktop2
 
 android: lib_install
-	CGO_LDFLAGS="-O2 -g -s -w -Wl,-z,max-page-size=16384" gomobile bind -v -androidapi=21 -javapkg=com.hiddify.core -libname=hiddify-core -tags=$(TAGS) -trimpath -ldflags="$(LDFLAGS)" -target=android -gcflags "all=-N -l" -o $(BINDIR)/$(LIBNAME).aar github.com/sagernet/sing-box/experimental/libbox ./platform/mobile
+	ANDROID_NDK_HOME="$(ANDROID_NDK_HOME)" NDK="$(NDK)" CGO_LDFLAGS="-O2 -g -s -w -Wl,-z,max-page-size=16384" gomobile bind -v -androidapi=21 -javapkg=com.hiddify.core -libname=hiddify-core -tags=$(TAGS) -trimpath -ldflags="$(LDFLAGS)" -target=android -gcflags "all=-N -l" -o $(BINDIR)/$(LIBNAME).aar github.com/sagernet/sing-box/experimental/libbox ./platform/mobile
 
 ios-full: lib_install
 	gomobile bind -v  -target ios,iossimulator,tvos,tvossimulator,macos -libname=hiddify-core -tags=$(TAGS),$(IOS_ADD_TAGS) -trimpath -ldflags="$(LDFLAGS)" -o $(BINDIR)/$(PRODUCT_NAME).xcframework github.com/sagernet/sing-box/experimental/libbox ./platform/mobile 
@@ -187,5 +189,4 @@ clean:
 release: # Create a new tag for release.	
 	@bash -c '.github/change_version.sh'
 	
-
 
