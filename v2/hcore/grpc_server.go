@@ -49,13 +49,12 @@ func Setup(params *SetupRequest, platformInterface libbox.PlatformInterface) err
 	}
 	mu.Lock()
 	defer mu.Unlock()
+	updatePlatformInterfaceLocked(params.Mode, platformInterface)
 	if grpcServer[params.Mode] != nil {
 		Log(LogLevel_WARNING, LogType_CORE, "grpcServer already started")
 		return nil
 	}
-	static.BaseContext = libbox.BaseContext(platformInterface)
 	static.debug = params.Debug
-	static.globalPlatformInterface = platformInterface
 	tcpConn := true // runtime.GOOS == "windows" // TODO add TVOS
 	libbox.Setup(
 		&libbox.SetupOptions{

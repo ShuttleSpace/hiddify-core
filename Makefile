@@ -16,6 +16,8 @@ IOS_ADD_TAGS=with_dhcp,with_low_memory,with_purego
 MACOS_ADD_TAGS=with_dhcp
 WINDOWS_ADD_TAGS=with_purego
 LDFLAGS=-w -s -checklinkname=0 -buildid= $${CODE_VERSION}
+DEBUG_LDFLAGS=-checklinkname=0 -buildid= $${CODE_VERSION}
+DEBUG_CGO_LDFLAGS=-O0 -g -Wl,-z,max-page-size=16384
 GOBUILDLIB=CGO_ENABLED=1 go build -trimpath -ldflags="$(LDFLAGS)" -buildmode=c-shared
 GOBUILDSRV=CGO_ENABLED=1 go build -ldflags="$(LDFLAGS)" -trimpath -tags $(TAGS)
 
@@ -48,6 +50,9 @@ headers:
 
 android: lib_install
 	ANDROID_NDK_HOME="$(ANDROID_NDK_HOME)" NDK="$(NDK)" CGO_LDFLAGS="-O2 -s -w -Wl,-z,max-page-size=16384" gomobile bind -v -androidapi=21 -javapkg=com.hiddify.core -libname=hiddify-core -tags=$(TAGS) -trimpath -ldflags="$(LDFLAGS)" -target=android -o $(BINDIR)/$(LIBNAME).aar github.com/sagernet/sing-box/experimental/libbox ./platform/mobile
+
+android-debug: lib_install
+	ANDROID_NDK_HOME="$(ANDROID_NDK_HOME)" NDK="$(NDK)" CGO_LDFLAGS="$(DEBUG_CGO_LDFLAGS)" gomobile bind -v -androidapi=21 -javapkg=com.hiddify.core -libname=hiddify-core -tags=$(TAGS) -trimpath -ldflags="$(DEBUG_LDFLAGS)" -target=android -o $(BINDIR)/$(LIBNAME)-debug.aar github.com/sagernet/sing-box/experimental/libbox ./platform/mobile
 
 android-arm:
 	ANDROID_NDK_HOME="$(ANDROID_NDK_HOME)" NDK="$(NDK)" CGO_LDFLAGS="-O2 -s -w -Wl,-z,max-page-size=16384" gomobile bind -v -androidapi=21 -javapkg=com.hiddify.core -libname=hiddify-core -tags=$(TAGS) -trimpath -ldflags="$(LDFLAGS)" -target=android/arm -o $(BINDIR)/$(LIBNAME)-arm.aar github.com/sagernet/sing-box/experimental/libbox ./platform/mobile
