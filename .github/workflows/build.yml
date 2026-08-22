@@ -2,6 +2,9 @@ name: Build
 on:
   workflow_call:
     inputs:
+      version:
+        type: string
+        default: ""
       upload-artifact:
         type: boolean
         default: true
@@ -12,7 +15,7 @@ on:
         type: string
         default: "dev"
 env:
-    REGISTRY_IMAGE: ghcr.io/hiddify/hiddify-core
+    REGISTRY_IMAGE: ghcr.io/shuttlespace/hiddify-core
 
 
 jobs:
@@ -52,6 +55,10 @@ jobs:
       - name: Calculate singbox version
         run: |-
           cd hiddify-sing-box
+          # `read_tag` calls `git describe --tags`, which fails when the
+          # submodule is checked out without tags (actions/checkout clones
+          # submodules shallowly and without tags). Fetch full history + tags.
+          git fetch --unshallow --tags origin 2>/dev/null || git fetch --tags origin
           go run -v ./cmd/internal/read_tag --ci --nightly
       - name: Set outputs
         id: outputs
@@ -69,7 +76,7 @@ jobs:
         with:
             fetch-depth: 0
       - run: |
-          curl -L -o hiddify-core.tar.gz https://codeload.github.com/hiddify/hiddify-core/tar.gz/${{ inputs.tag-name  }}
+          curl -L -o hiddify-core.tar.gz https://codeload.github.com/ShuttleSpace/hiddify-core/tar.gz/${{ inputs.tag-name  }}
           HIDDIFY_CORE_WRT_HASH=$(sha256sum hiddify-core.tar.gz | cut -d' ' -f1)
           github_ref_name="${{ inputs.tag-name }}"
           IFS="." read -r -a VERSION_ARRAY <<< "${github_ref_name#v}"
@@ -747,5 +754,4 @@ jobs:
         run: |
           docker buildx imagetools inspect ${{ env.REGISTRY_IMAGE }}:${{ env.LATEST }}
           docker buildx imagetools inspect ${{ env.REGISTRY_IMAGE }}:${{ inputs.tag-name  }}
-
 

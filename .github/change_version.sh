@@ -17,7 +17,7 @@ SED "s|ENV VERSION=.*|ENV VERSION=v${TAG}|g" platform/docker/Dockerfile
 git add Info.plist platform/docker/Dockerfile 
 git commit -m "release: version ${TAG}" 
 echo "creating git tag : v${TAG}" 
-git push 
+git push ${GIT_REMOTE:-origin}
 git tag v${TAG} 
-git push --tags 
+git push ${GIT_REMOTE:-origin} --tags 
 echo "Github Actions will detect the new tag and release the new version."
