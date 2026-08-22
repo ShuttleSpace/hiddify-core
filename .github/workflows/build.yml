@@ -2,6 +2,9 @@ name: Build
 on:
   workflow_call:
     inputs:
+      version:
+        type: string
+        default: ""
       upload-artifact:
         type: boolean
         default: true
@@ -747,5 +750,4 @@ jobs:
         run: |
           docker buildx imagetools inspect ${{ env.REGISTRY_IMAGE }}:${{ env.LATEST }}
           docker buildx imagetools inspect ${{ env.REGISTRY_IMAGE }}:${{ inputs.tag-name  }}
-
 
