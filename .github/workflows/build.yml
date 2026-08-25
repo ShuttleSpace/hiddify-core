@@ -55,10 +55,13 @@ jobs:
       - name: Calculate singbox version
         run: |-
           cd hiddify-sing-box
-          # `read_tag` calls `git describe --tags`, which fails when the
-          # submodule is checked out without tags (actions/checkout clones
-          # submodules shallowly and without tags). Fetch full history + tags.
-          git fetch --unshallow --tags origin 2>/dev/null || git fetch --tags origin
+          # `read_tag` calls `git describe --tags`, which needs version tags.
+          # The ShuttleSpace fork has no tags (forks don't mirror upstream
+          # tags), so fetch them read-only from the upstream sing-box repo for
+          # version numbering. Unshallow first in case the submodule was
+          # cloned with a shallow depth.
+          git fetch --unshallow origin 2>/dev/null || true
+          git fetch --tags --force https://github.com/hiddify/hiddify-sing-box
           go run -v ./cmd/internal/read_tag --ci --nightly
       - name: Set outputs
         id: outputs
