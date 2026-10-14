@@ -531,6 +531,21 @@ func setInbound(options *option.Options, hopt *HiddifyOptions) {
 		binds = append(binds, "127.0.0.1")
 	}
 
+	// Only one listener may own the system proxy. Each owner re-applies on every
+	// route change, so two of them overwrite each other and the proxy can end up
+	// pointing at whichever address happened to be written last. Prefer the IPv4
+	// loopback listener so the OS records 127.0.0.1 rather than ::1.
+	systemProxyBind := ""
+	for _, bind := range binds {
+		if bind == "127.0.0.1" {
+			systemProxyBind = bind
+			break
+		}
+	}
+	if systemProxyBind == "" && len(binds) == 1 {
+		systemProxyBind = binds[0]
+	}
+
 	for _, bind := range binds {
 		addr := badoption.Addr(netip.MustParseAddr(bind))
 
@@ -549,7 +564,7 @@ func setInbound(options *option.Options, hopt *HiddifyOptions) {
 						// 	DomainStrategy:           inboundDomainStrategy,
 						// },
 					},
-					SetSystemProxy: hopt.SetSystemProxy,
+					SetSystemProxy: hopt.SetSystemProxy && bind == systemProxyBind,
 				},
 			},
 		)

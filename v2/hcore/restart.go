@@ -25,9 +25,14 @@ func Restart(ctx context.Context, in *StartRequest) (coreResponse *CoreInfoRespo
 	// 	return errorWrapper(MessageType_INSTANCE_NOT_FOUND, fmt.Errorf("instance not found"))
 	// }
 
-	resp, err := Stop()
-	if err != nil {
-		return resp, err
+	// Stop can fail after the box has already given up its resources: Box.Close
+	// aggregates errors and keeps going, so every component is closed including
+	// the inbound that frees the mixed port. Report the cleanup failure but still
+	// start the configuration the user asked for. Otherwise a transient
+	// networksetup error while releasing the macOS system proxy leaves the app
+	// stuck in the mode it was trying to leave.
+	if _, err := Stop(); err != nil {
+		log.Warn("[Service] stopping before restart reported: ", err)
 	}
 
 	if C.IsAndroid && static.HiddifyOptions.EnableTun {
