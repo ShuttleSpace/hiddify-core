@@ -60,8 +60,13 @@ jobs:
           # tags), so fetch them read-only from the upstream sing-box repo for
           # version numbering. Unshallow first in case the submodule was
           # cloned with a shallow depth.
-          git fetch --unshallow origin 2>/dev/null || true
-          git fetch --tags --force https://github.com/hiddify/hiddify-sing-box
+          #
+          # Only this repo's own tags matter here. Recursing into the replace/*
+          # submodules re-fetches tailscale/wireguard-go, whose nested pins are
+          # not all present on the ShuttleSpace forks, and that fails the step
+          # with "not our ref" before read_tag ever runs.
+          git fetch --no-recurse-submodules --unshallow origin 2>/dev/null || true
+          git fetch --no-recurse-submodules --tags --force https://github.com/hiddify/hiddify-sing-box
           go run -v ./cmd/internal/read_tag --ci --nightly
       - name: Set outputs
         id: outputs
