@@ -1,36 +1,33 @@
 package hcore
 
-// func (s *CoreService) GetSystemProxyStatus(ctx context.Context, empty *hcommon.Empty) (*SystemProxyStatus, error) {
-// 	return GetSystemProxyStatus(ctx, empty)
-// }
+import (
+	"context"
 
-// func GetSystemProxyStatus(ctx context.Context, empty *hcommon.Empty) (*SystemProxyStatus, error) {
-// 	status, err := libbox.NewStandaloneCommandClient().GetSystemProxyStatus()
-// 	if err != nil {
-// 		return nil, err
-// 	}
+	"github.com/hiddify/hiddify-core/v2/hcommon"
+	"github.com/sagernet/sing-box/common/settings"
+)
 
-// 	return &SystemProxyStatus{
-// 		Available: status.Available,
-// 		Enabled:   status.Enabled,
-// 	}, nil
-// }
-
-// func (s *CoreService) SetSystemProxyEnabled(ctx context.Context, in *SetSystemProxyEnabledRequest) (*hcommon.Response, error) {
-// 	return SetSystemProxyEnabled(ctx, in)
-// }
-
-// func SetSystemProxyEnabled(ctx context.Context, in *SetSystemProxyEnabledRequest) (*hcommon.Response, error) {
-// 	err := libbox.NewStandaloneCommandClient().SetSystemProxyEnabled(in.IsEnabled)
-// 	if err != nil {
-// 		return &hcommon.Response{
-// 			Code:    hcommon.ResponseCode_FAILED,
-// 			Message: err.Error(),
-// 		}, err
-// 	}
-
-// 	return &hcommon.Response{
-// 		Code:    hcommon.ResponseCode_OK,
-// 		Message: "",
-// 	}, nil
-// }
+// SetSystemProxyEnabled hands the OS back without stopping the tunnel.
+//
+// Only the disabling direction is offered. Enabling is the inbound's job: it is the
+// thing that owns the mixed port the proxy has to point at, so there is nothing to
+// turn on until the box is (re)started with set_system_proxy, which the service
+// mode change already arranges for the next connection.
+func (s *CoreService) SetSystemProxyEnabled(ctx context.Context, in *SetSystemProxyEnabledRequest) (*hcommon.Response, error) {
+	if in.IsEnabled {
+		return &hcommon.Response{
+			Code:    hcommon.ResponseCode_FAILED,
+			Message: "the system proxy is enabled by the inbound that owns it; switch the service mode instead",
+		}, nil
+	}
+	if err := settings.ReleaseSystemProxy(); err != nil {
+		return &hcommon.Response{
+			Code:    hcommon.ResponseCode_FAILED,
+			Message: err.Error(),
+		}, err
+	}
+	return &hcommon.Response{
+		Code:    hcommon.ResponseCode_OK,
+		Message: "",
+	}, nil
+}
