@@ -608,7 +608,14 @@ jobs:
   upload-release:
     permissions: write-all
     if: ${{ inputs.channel=='prod' }}
-    needs: [build,build-binary]
+    # The fork publishes only the hiddify-lib-*.tar.gz archives to GitHub
+    # releases; it does not ship signed .deb/.rpm/.ipk distro packages (those
+    # need GPG signing secrets this fork does not have). build-binary still
+    # runs and its Package DEB failures stay visible in the run, but they must
+    # not gate the release of the libraries the app downloads. This is the
+    # fork's own pre-merge dependency; the upstream 5.5.5 merge replaced it
+    # with [build,build-binary], which made every prod release unreachable.
+    needs: [build]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
