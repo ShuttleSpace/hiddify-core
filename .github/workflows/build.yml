@@ -53,7 +53,7 @@ jobs:
       - name: Calculate singbox version
         run: |-
           cd hiddify-sing-box
-# `read_tag` calls `git describe --tags`, which needs version tags.
+          # `read_tag` calls `git describe --tags`, which needs version tags.
           # The ShuttleSpace fork has no tags (forks don't mirror upstream
           # tags), so fetch them read-only from the upstream sing-box repo for
           # version numbering. Unshallow first in case the submodule was
