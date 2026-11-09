@@ -48,7 +48,8 @@ jobs:
       - name: Calculate version
         if: github.event_name != 'workflow_dispatch' && "${{ inputs.tag-name }}" == "draft"
         run: |-
-          echo "hiddify_version=$(git describe --tags)" >> "$GITHUB_ENV"
+          # only version tags count
+          echo "hiddify_version=$(git describe --tags --match 'v[0-9]*')" >> "$GITHUB_ENV"
       - name: Calculate singbox version
         run: |-
           cd hiddify-sing-box
@@ -72,27 +73,6 @@ jobs:
           echo "singbox_version=$version" >> "$GITHUB_OUTPUT"
   
           
-  update_wrt_hash:
-    permissions: write-all
-    runs-on: ubuntu-latest
-    if: ${{ inputs.channel=='prod' }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-            fetch-depth: 0
-      - run: |
-          curl -L -o hiddify-core.tar.gz https://codeload.github.com/hiddify/hiddify-core/tar.gz/${{ inputs.tag-name  }}
-          HIDDIFY_CORE_WRT_HASH=$(sha256sum hiddify-core.tar.gz | cut -d' ' -f1)
-          github_ref_name="${{ inputs.tag-name }}"
-          IFS="." read -r -a VERSION_ARRAY <<< "${github_ref_name#v}"
-          VERSION_STR="${VERSION_ARRAY[0]}.${VERSION_ARRAY[1]}.${VERSION_ARRAY[2]}"
-          sed -i "s|PKG_VERSION:=.*|PKG_VERSION:=${VERSION_STR}|g" platform/wrt/Makefile
-          sed -i "s|PKG_HASH:=.*|PKG_HASH:=${HIDDIFY_CORE_WRT_HASH}|g" platform/wrt/Makefile 
-      - uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-            commit_message: "Update WRT package HASH."
-            branch: main
-            # push_options: --force
   build:
     needs:
       - calculate_version
@@ -209,8 +189,10 @@ jobs:
                 -o -name "hiddify-core.aar" \
                 -o -name "webui" \
                 -o -name "HiddifyCore.xcframework" \
+                -o -name "HiddifyTunnelCore.xcframework" \
                 -o -name "HiddifyCli" \
-                -o -name "HiddifyCli.exe" \))
+                -o -name "HiddifyCli.exe" \
+                -o -name "HiddifyAdmin.exe" \))
           echo tar -czvf ${{ matrix.job.name }}.tar.gz  $files
           tar -czvf ${{ matrix.job.name }}.tar.gz  $files
           
@@ -244,7 +226,7 @@ jobs:
       CODE_VERSION: "-X github.com/hiddify/hiddify-core/v2/hcommon/constants.Version=${{ needs.calculate_version.outputs.hiddify_version }} -X github.com/sagernet/sing-box/constant.Version=${{ needs.calculate_version.outputs.singbox_version }}"
       
     strategy:
-      # fail-fast: false
+      fail-fast: false
       matrix:
         include:
           - { os: linux, arch: amd64, variant: purego, naive: true }
@@ -369,10 +351,9 @@ jobs:
       - name: Set build tags
         run: |
           set -xeuo pipefail
-          TAGS='with_v2ray_api,with_gvisor,with_quic,with_dhcp,with_wireguard,with_utls,with_acme,with_clash_api,with_tailscale,with_ccm,with_ocm,tfogo_checklinkname0'
-          if [[ "${{ matrix.naive }}" == "true" ]]; then
-            TAGS="${TAGS},with_naive_outbound"
-          fi
+          # Tags come from the Makefile (single source of truth); only variant-specific tags are added here.
+          NAIVE=1; [[ "${{ matrix.naive }}" == "true" ]] || NAIVE=0
+          TAGS="$(make -s --no-print-directory NAIVE=$NAIVE print-CLI_TAGS)"
           if [[ "${{ matrix.variant }}" == "purego" ]]; then
             TAGS="${TAGS},with_purego"
           elif [[ "${{ matrix.variant }}" == "musl" ]]; then
@@ -385,7 +366,7 @@ jobs:
           set -xeuo pipefail
           mkdir -p dist
           go build -v -trimpath -o dist/hiddify-core -tags "${BUILD_TAGS}" \
-          -ldflags "-s -buildid= ${CODE_VERSION} -X internal/godebug.defaultGODEBUG=multipathtcp=0 -checklinkname=0" \
+          -ldflags "-s -buildid= ${CODE_VERSION} -checklinkname=0" \
           ./cmd/main/
         env:
           CGO_ENABLED: "0"
@@ -399,15 +380,17 @@ jobs:
       - name: Extract libcronet.so
         if: matrix.variant == 'purego' && matrix.naive
         run: |
-          cd ~/cronet-go
-          CGO_ENABLED=0 go run -v ./cmd/build-naive extract-lib --target ${{ matrix.os }}/${{ matrix.arch }} -o $GITHUB_WORKSPACE/dist
+          set -xeuo pipefail
+          # cronet-go ships the prebuilt library; its build-naive has no extract-lib command
+          mkdir -p "$GITHUB_WORKSPACE/dist"
+          cp ~/cronet-go/lib/${{ matrix.os }}_${{ matrix.arch }}/libcronet.so "$GITHUB_WORKSPACE/dist/"
       - name: Build (glibc)
         if: matrix.variant == 'glibc'
         run: |
           set -xeuo pipefail
           mkdir -p dist
           go build -v -trimpath -o dist/hiddify-core -tags "${BUILD_TAGS}" \
-          -ldflags "-s -buildid= ${CODE_VERSION} -X internal/godebug.defaultGODEBUG=multipathtcp=0 -checklinkname=0" \
+          -ldflags "-s -buildid= ${CODE_VERSION} -checklinkname=0" \
           ./cmd/main/
         env:
           CGO_ENABLED: "1"
@@ -422,7 +405,7 @@ jobs:
           set -xeuo pipefail
           mkdir -p dist
           go build -v -trimpath -o dist/hiddify-core -tags "${BUILD_TAGS}" \
-          -ldflags "-s -buildid= ${CODE_VERSION} -X internal/godebug.defaultGODEBUG=multipathtcp=0 -checklinkname=0" \
+          -ldflags "-s -buildid= ${CODE_VERSION} -checklinkname=0" \
           ./cmd/main/
         env:
           CGO_ENABLED: "1"
@@ -437,7 +420,7 @@ jobs:
           set -xeuo pipefail
           mkdir -p dist
           go build -v -trimpath -o dist/hiddify-core -tags "${BUILD_TAGS}" \
-          -ldflags "-s -buildid= ${CODE_VERSION} -X internal/godebug.defaultGODEBUG=multipathtcp=0 -checklinkname=0" \
+          -ldflags "-s -buildid= ${CODE_VERSION} -checklinkname=0" \
           ./cmd/main/
         env:
           CGO_ENABLED: "0"
@@ -457,7 +440,7 @@ jobs:
           export CXX="${CC}++"
           mkdir -p dist
           GOOS=$BUILD_GOOS GOARCH=$BUILD_GOARCH build go build -v -trimpath -o dist/hiddify-core -tags "${BUILD_TAGS}" \
-          -ldflags "-s -buildid= ${CODE_VERSION} -X internal/godebug.defaultGODEBUG=multipathtcp=0 -checklinkname=0" \
+          -ldflags "-s -buildid= ${CODE_VERSION} -checklinkname=0" \
           ./cmd/main/
         env:
           CGO_ENABLED: "1"
@@ -498,8 +481,15 @@ jobs:
             -p "dist/hiddify-core_${{ matrix.os }}_${{ matrix.debian }}.deb" \
             --architecture ${{ matrix.debian }} \
             dist/hiddify-core=/usr/bin/hiddify-core
+          # Older Ubuntu needs this debsigs fix; Resolute+ already has it (patch then exits 1).
           curl -Lo '/tmp/debsigs.diff' 'https://gitlab.com/debsigs/debsigs/-/commit/160138f5de1ec110376d3c807b60a37388bc7c90.diff'
-          sudo patch /usr/bin/debsigs < '/tmp/debsigs.diff'
+          set +e
+          sudo patch -N -r - /usr/bin/debsigs < '/tmp/debsigs.diff'
+          patch_status=$?
+          set -e
+          if [ "$patch_status" -gt 1 ]; then
+            exit "$patch_status"
+          fi
           rm -rf $HOME/.gnupg
           echo "${{ secrets.GPG_KEY }}" | base64 -d | gpg --batch --yes --pinentry-mode loopback --import
           debsigs --sign=origin -k ${{ secrets.GPG_KEY_ID }} --gpgopts '--pinentry-mode loopback --passphrase "${{ secrets.GPG_PASSPHRASE }}"' dist/*.deb
@@ -533,21 +523,23 @@ jobs:
             -p "dist/hiddify-core_${{ matrix.os }}_${{ matrix.pacman }}.pkg.tar.zst" \
             --architecture ${{ matrix.pacman }} \
             dist/hiddify-core=/usr/bin/hiddify-core
-      - name: Package OpenWrt
+      - name: Install apk-tools
         if: matrix.openwrt != ''
         run: |-
+          # apk-tools 3, static: `apk mkpkg` and `apk mkndx` are what OpenWrt 25.12 builds with
+          docker run --rm -v /usr/local/bin:/mnt alpine:edge sh -c "apk add --no-cache apk-tools-static && cp /sbin/apk.static /mnt/apk && chmod +x /mnt/apk"
+          apk --version
+      - name: Package OpenWrt
+        if: matrix.openwrt != ''
+        env:
+          SOURCE_DATE_EPOCH: "0"
+        run: |-
           set -xeuo pipefail
-          sudo gem install fpm
-          cp .fpm_openwrt .fpm
-          fpm -t deb \
-            -v "$PKG_VERSION" \
-            -p "dist/openwrt.deb" \
-            --architecture all \
-            dist/hiddify-core=/usr/bin/hiddify-core
+          version="${{ needs.calculate_version.outputs.hiddify_version }}"
           for architecture in ${{ matrix.openwrt }}; do
-            hiddify-sing-box/.github/deb2ipk.sh "$architecture" "dist/openwrt.deb" "dist/hiddify-core_openwrt_${architecture}.ipk"
+            release/openwrt/build-ipk.sh "$architecture" "$version" dist/hiddify-core "dist/hiddify-core_${version#v}_${architecture}.ipk"
+            release/openwrt/build-apk.sh "$architecture" "$version" dist/hiddify-core dist/
           done
-          rm "dist/openwrt.deb"
       - name: Archive
         run: |
           set -xeuo pipefail
@@ -616,7 +608,7 @@ jobs:
   upload-release:
     permissions: write-all
     if: ${{ inputs.channel=='prod' }}
-    needs: [build]
+    needs: [build,build-binary]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
@@ -636,10 +628,15 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ inputs.tag-name  }}
-
-          files: bin/*.tar.gz
-
-
+          # the archives, and the packages built and signed beside them (they used to be dropped)
+          files: |
+            bin/*.tar.gz
+            bin/*.zip
+            bin/*.ipk
+            bin/*.apk
+            bin/*.deb
+            bin/*.rpm
+            bin/*.pkg.tar.zst
 
   delete-artifact:
     runs-on: ubuntu-latest

@@ -37,12 +37,32 @@ func patchOutboundTLSTricks(base option.Outbound, configOpt HiddifyOptions) opti
 		tls = tlsopt.TakeOutboundTLSOptions()
 	}
 
+	// H: migrate legacy tls.tls_fragment object onto the dialer (issue #2399)
+	if tls != nil && tls.TLSFragment != nil && tls.TLSFragment.Enabled {
+		if opts, ok := base.Options.(option.DialerOptionsWrapper); ok {
+			dialer := opts.TakeDialerOptions()
+			if !dialer.TLSFragment.Enabled {
+				dialer.TCPFastOpen = false
+				dialer.TLSFragment = *tls.TLSFragment
+				opts.ReplaceDialerOptions(dialer)
+			}
+		}
+		tls.TLSFragment = nil
+		if tlsopt, ok := base.Options.(option.OutboundTLSOptionsWrapper); ok {
+			tlsopt.ReplaceOutboundTLSOptions(tls)
+		}
+	}
+
+	// Outbound options are pointers, from the parser's registry and from ray2sing alike. Matching
+	// the value types never found a transport, so the fragment and mixed-case SNI settings were
+	// skipped for every VLESS, VMess and Trojan outbound.
 	var transport *option.V2RayTransportOptions
-	if opts, ok := base.Options.(option.VLESSOutboundOptions); ok {
+	switch opts := base.Options.(type) {
+	case *option.VLESSOutboundOptions:
 		transport = opts.Transport
-	} else if opts, ok := base.Options.(option.TrojanOutboundOptions); ok {
+	case *option.TrojanOutboundOptions:
 		transport = opts.Transport
-	} else if opts, ok := base.Options.(option.VMessOutboundOptions); ok {
+	case *option.VMessOutboundOptions:
 		transport = opts.Transport
 	}
 
@@ -54,7 +74,10 @@ func patchOutboundTLSTricks(base option.Outbound, configOpt HiddifyOptions) opti
 		return base
 	}
 
-	if transport.Type != C.V2RayTransportTypeWebsocket && transport.Type != C.V2RayTransportTypeGRPC && transport.Type != C.V2RayTransportTypeHTTPUpgrade {
+	switch transport.Type {
+	case C.V2RayTransportTypeWebsocket, C.V2RayTransportTypeGRPC, C.V2RayTransportTypeHTTPUpgrade, C.V2RayTransportTypeXHTTP, C.V2RayTransportTypeHTTP:
+		// fragment applies to TLS ClientHello on these transports
+	default:
 		return base
 	}
 
@@ -90,14 +113,15 @@ func patchOutboundFragment(base option.Outbound, configOpt HiddifyOptions) optio
 		if opts, ok := base.Options.(option.DialerOptionsWrapper); ok {
 			dialer := opts.TakeDialerOptions()
 			dialer.TCPFastOpen = false
-			// dialer.TLSFragment = option.TLSFragmentOptions{
-			// 	Enabled: configOpt.TLSTricks.EnableFragment,
-			// 	Size:    configOpt.TLSTricks.FragmentSize,
-			// 	Sleep:   configOpt.TLSTricks.FragmentSleep,
-			// }
+			if !dialer.TLSFragment.Enabled {
+				dialer.TLSFragment = option.TLSFragmentOptions{
+					Enabled: true,
+					Size:    configOpt.TLSTricks.FragmentSize,
+					Sleep:   configOpt.TLSTricks.FragmentSleep,
+				}
+			}
 			opts.ReplaceDialerOptions(dialer)
 		}
-
 	}
 
 	return base
@@ -137,6 +161,7 @@ func patchEndpoint(base *option.Endpoint, configOpt HiddifyOptions, staticIPs *m
 func patchOutbound(base option.Outbound, configOpt HiddifyOptions, staticIPs *map[string][]string) (*option.Outbound, error) {
 
 	base = patchOutboundTLSTricks(base, configOpt)
+	patchOutboundDiscoveryCountry(base, configOpt)
 
 	// switch base.Type {
 	// case C.TypeVMess, C.TypeVLESS, C.TypeTrojan, C.TypeShadowsocks:
@@ -145,6 +170,36 @@ func patchOutbound(base option.Outbound, configOpt HiddifyOptions, staticIPs *ma
 	// base = patchOutboundXray(base, configOpt, *staticIPs)
 
 	return &base, nil
+}
+
+// patchOutboundDiscoveryCountry gives a DNS tunnel outbound (dnstt, masterdns, soar) without a
+// discovery country the app's region, so its "auto" resolvers start with the bundled resolvers
+// of the user's country. A soar outbound without smart_pool gets one, enabled as by default.
+func patchOutboundDiscoveryCountry(base option.Outbound, configOpt HiddifyOptions) {
+	if configOpt.Region == "" || configOpt.Region == "other" {
+		return
+	}
+	var pool **option.SmartPoolOptions
+	enabled := false
+	switch opts := base.Options.(type) {
+	case *option.SoarOptions:
+		pool, enabled = &opts.SmartPool, true
+	case *option.MasterDNSOptions:
+		pool = &opts.SmartPool
+	case *option.DnsttOptions:
+		pool = &opts.SmartPool
+	default:
+		return
+	}
+	if *pool == nil {
+		*pool = &option.SmartPoolOptions{Enabled: enabled}
+	}
+	if (*pool).Discovery == nil {
+		(*pool).Discovery = &option.ResolverDiscoveryOptions{}
+	}
+	if (*pool).Discovery.Country == "" {
+		(*pool).Discovery.Country = configOpt.Region
+	}
 }
 
 // func patchOutboundXray(base option.Outbound, configOpt HiddifyOptions, staticIpsDns map[string][]string) outboundMap {

@@ -36,12 +36,20 @@ const (
 	Core_SelectOutbound_FullMethodName        = "/hcore.Core/SelectOutbound"
 	Core_UrlTest_FullMethodName               = "/hcore.Core/UrlTest"
 	Core_UrlTestActive_FullMethodName         = "/hcore.Core/UrlTestActive"
+	Core_UploadTest_FullMethodName            = "/hcore.Core/UploadTest"
+	Core_DownloadTest_FullMethodName          = "/hcore.Core/DownloadTest"
+	Core_ClearSpeedTests_FullMethodName       = "/hcore.Core/ClearSpeedTests"
 	Core_GenerateWarpConfig_FullMethodName    = "/hcore.Core/GenerateWarpConfig"
 	Core_GetSystemProxyStatus_FullMethodName  = "/hcore.Core/GetSystemProxyStatus"
 	Core_SetSystemProxyEnabled_FullMethodName = "/hcore.Core/SetSystemProxyEnabled"
 	Core_LogListener_FullMethodName           = "/hcore.Core/LogListener"
 	Core_Close_FullMethodName                 = "/hcore.Core/Close"
 	Core_GetLANIP_FullMethodName              = "/hcore.Core/GetLANIP"
+	Core_IsAdmin_FullMethodName               = "/hcore.Core/IsAdmin"
+	Core_NeedAdminBgService_FullMethodName    = "/hcore.Core/NeedAdminBgService"
+	Core_EnsureAdminBgService_FullMethodName  = "/hcore.Core/EnsureAdminBgService"
+	Core_ListCrashReports_FullMethodName      = "/hcore.Core/ListCrashReports"
+	Core_ExportDiagnostics_FullMethodName     = "/hcore.Core/ExportDiagnostics"
 )
 
 // CoreClient is the client API for Core service.
@@ -69,12 +77,34 @@ type CoreClient interface {
 	SelectOutbound(ctx context.Context, in *SelectOutboundRequest, opts ...grpc.CallOption) (*hcommon.Response, error)
 	UrlTest(ctx context.Context, in *UrlTestRequest, opts ...grpc.CallOption) (*hcommon.Response, error)
 	UrlTestActive(ctx context.Context, in *hcommon.Empty, opts ...grpc.CallOption) (*hcommon.Response, error)
+	// Measure the upload or download speed through a proxy, or each proxy of a group, at
+	// speed.cloudflare.com; the results come with the outbounds info (upload_speed, download_speed).
+	UploadTest(ctx context.Context, in *SpeedTestRequest, opts ...grpc.CallOption) (*hcommon.Response, error)
+	DownloadTest(ctx context.Context, in *SpeedTestRequest, opts ...grpc.CallOption) (*hcommon.Response, error)
+	// Forgets every speed test result, of this run and the earlier ones kept.
+	ClearSpeedTests(ctx context.Context, in *hcommon.Empty, opts ...grpc.CallOption) (*hcommon.Response, error)
 	GenerateWarpConfig(ctx context.Context, in *GenerateWarpConfigRequest, opts ...grpc.CallOption) (*WarpGenerationResponse, error)
 	GetSystemProxyStatus(ctx context.Context, in *hcommon.Empty, opts ...grpc.CallOption) (*SystemProxyStatus, error)
 	SetSystemProxyEnabled(ctx context.Context, in *SetSystemProxyEnabledRequest, opts ...grpc.CallOption) (*hcommon.Response, error)
 	LogListener(ctx context.Context, in *LogRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[LogMessage], error)
 	Close(ctx context.Context, in *CloseRequest, opts ...grpc.CallOption) (*hcommon.Empty, error)
 	GetLANIP(ctx context.Context, in *hcommon.Empty, opts ...grpc.CallOption) (*LANIPResponse, error)
+	// Whether this core process already has administrator/root rights (same token as the app).
+	IsAdmin(ctx context.Context, in *hcommon.Empty, opts ...grpc.CallOption) (*IsAdminResponse, error)
+	// Windows/Linux: whether elevated admin_bgservice is required for this connect.
+	NeedAdminBgService(ctx context.Context, in *NeedAdminBgServiceRequest, opts ...grpc.CallOption) (*NeedAdminBgServiceResponse, error)
+	// Windows/Linux: install/start admin_bgservice if needed and start the bg core until STARTED.
+	EnsureAdminBgService(ctx context.Context, in *EnsureAdminBgServiceRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[EnsureAdminBgServiceEvent], error)
+	// The crash reports in this core's working directory: the archived ones (crash_reports,
+	// oom_reports) and the live stderr files that hold a crash, newest last.
+	ListCrashReports(ctx context.Context, in *hcommon.Empty, opts ...grpc.CallOption) (*CrashReportList, error)
+	// A zip of this core's diagnostics: the crash, OOM and power reports, the stderr and core log
+	// files, the previous run's goroutines (a snapshot the core writes every minute while connected,
+	// kept aside at the next start), the running config with servers and secrets removed, and the
+	// files the request adds. Text is scrubbed of addresses, links and secrets. Returns the zip's
+	// path, and its bytes when the request asks for them (a core in another process, whose files the
+	// app cannot read).
+	ExportDiagnostics(ctx context.Context, in *ExportDiagnosticsRequest, opts ...grpc.CallOption) (*ExportDiagnosticsResponse, error)
 }
 
 type coreClient struct {
@@ -281,6 +311,36 @@ func (c *coreClient) UrlTestActive(ctx context.Context, in *hcommon.Empty, opts 
 	return out, nil
 }
 
+func (c *coreClient) UploadTest(ctx context.Context, in *SpeedTestRequest, opts ...grpc.CallOption) (*hcommon.Response, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(hcommon.Response)
+	err := c.cc.Invoke(ctx, Core_UploadTest_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *coreClient) DownloadTest(ctx context.Context, in *SpeedTestRequest, opts ...grpc.CallOption) (*hcommon.Response, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(hcommon.Response)
+	err := c.cc.Invoke(ctx, Core_DownloadTest_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *coreClient) ClearSpeedTests(ctx context.Context, in *hcommon.Empty, opts ...grpc.CallOption) (*hcommon.Response, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(hcommon.Response)
+	err := c.cc.Invoke(ctx, Core_ClearSpeedTests_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *coreClient) GenerateWarpConfig(ctx context.Context, in *GenerateWarpConfigRequest, opts ...grpc.CallOption) (*WarpGenerationResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(WarpGenerationResponse)
@@ -350,6 +410,65 @@ func (c *coreClient) GetLANIP(ctx context.Context, in *hcommon.Empty, opts ...gr
 	return out, nil
 }
 
+func (c *coreClient) IsAdmin(ctx context.Context, in *hcommon.Empty, opts ...grpc.CallOption) (*IsAdminResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(IsAdminResponse)
+	err := c.cc.Invoke(ctx, Core_IsAdmin_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *coreClient) NeedAdminBgService(ctx context.Context, in *NeedAdminBgServiceRequest, opts ...grpc.CallOption) (*NeedAdminBgServiceResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(NeedAdminBgServiceResponse)
+	err := c.cc.Invoke(ctx, Core_NeedAdminBgService_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *coreClient) EnsureAdminBgService(ctx context.Context, in *EnsureAdminBgServiceRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[EnsureAdminBgServiceEvent], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &Core_ServiceDesc.Streams[5], Core_EnsureAdminBgService_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[EnsureAdminBgServiceRequest, EnsureAdminBgServiceEvent]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Core_EnsureAdminBgServiceClient = grpc.ServerStreamingClient[EnsureAdminBgServiceEvent]
+
+func (c *coreClient) ListCrashReports(ctx context.Context, in *hcommon.Empty, opts ...grpc.CallOption) (*CrashReportList, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CrashReportList)
+	err := c.cc.Invoke(ctx, Core_ListCrashReports_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *coreClient) ExportDiagnostics(ctx context.Context, in *ExportDiagnosticsRequest, opts ...grpc.CallOption) (*ExportDiagnosticsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ExportDiagnosticsResponse)
+	err := c.cc.Invoke(ctx, Core_ExportDiagnostics_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // CoreServer is the server API for Core service.
 // All implementations must embed UnimplementedCoreServer
 // for forward compatibility.
@@ -375,12 +494,34 @@ type CoreServer interface {
 	SelectOutbound(context.Context, *SelectOutboundRequest) (*hcommon.Response, error)
 	UrlTest(context.Context, *UrlTestRequest) (*hcommon.Response, error)
 	UrlTestActive(context.Context, *hcommon.Empty) (*hcommon.Response, error)
+	// Measure the upload or download speed through a proxy, or each proxy of a group, at
+	// speed.cloudflare.com; the results come with the outbounds info (upload_speed, download_speed).
+	UploadTest(context.Context, *SpeedTestRequest) (*hcommon.Response, error)
+	DownloadTest(context.Context, *SpeedTestRequest) (*hcommon.Response, error)
+	// Forgets every speed test result, of this run and the earlier ones kept.
+	ClearSpeedTests(context.Context, *hcommon.Empty) (*hcommon.Response, error)
 	GenerateWarpConfig(context.Context, *GenerateWarpConfigRequest) (*WarpGenerationResponse, error)
 	GetSystemProxyStatus(context.Context, *hcommon.Empty) (*SystemProxyStatus, error)
 	SetSystemProxyEnabled(context.Context, *SetSystemProxyEnabledRequest) (*hcommon.Response, error)
 	LogListener(*LogRequest, grpc.ServerStreamingServer[LogMessage]) error
 	Close(context.Context, *CloseRequest) (*hcommon.Empty, error)
 	GetLANIP(context.Context, *hcommon.Empty) (*LANIPResponse, error)
+	// Whether this core process already has administrator/root rights (same token as the app).
+	IsAdmin(context.Context, *hcommon.Empty) (*IsAdminResponse, error)
+	// Windows/Linux: whether elevated admin_bgservice is required for this connect.
+	NeedAdminBgService(context.Context, *NeedAdminBgServiceRequest) (*NeedAdminBgServiceResponse, error)
+	// Windows/Linux: install/start admin_bgservice if needed and start the bg core until STARTED.
+	EnsureAdminBgService(*EnsureAdminBgServiceRequest, grpc.ServerStreamingServer[EnsureAdminBgServiceEvent]) error
+	// The crash reports in this core's working directory: the archived ones (crash_reports,
+	// oom_reports) and the live stderr files that hold a crash, newest last.
+	ListCrashReports(context.Context, *hcommon.Empty) (*CrashReportList, error)
+	// A zip of this core's diagnostics: the crash, OOM and power reports, the stderr and core log
+	// files, the previous run's goroutines (a snapshot the core writes every minute while connected,
+	// kept aside at the next start), the running config with servers and secrets removed, and the
+	// files the request adds. Text is scrubbed of addresses, links and secrets. Returns the zip's
+	// path, and its bytes when the request asks for them (a core in another process, whose files the
+	// app cannot read).
+	ExportDiagnostics(context.Context, *ExportDiagnosticsRequest) (*ExportDiagnosticsResponse, error)
 	mustEmbedUnimplementedCoreServer()
 }
 
@@ -439,6 +580,15 @@ func (UnimplementedCoreServer) UrlTest(context.Context, *UrlTestRequest) (*hcomm
 func (UnimplementedCoreServer) UrlTestActive(context.Context, *hcommon.Empty) (*hcommon.Response, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UrlTestActive not implemented")
 }
+func (UnimplementedCoreServer) UploadTest(context.Context, *SpeedTestRequest) (*hcommon.Response, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UploadTest not implemented")
+}
+func (UnimplementedCoreServer) DownloadTest(context.Context, *SpeedTestRequest) (*hcommon.Response, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DownloadTest not implemented")
+}
+func (UnimplementedCoreServer) ClearSpeedTests(context.Context, *hcommon.Empty) (*hcommon.Response, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ClearSpeedTests not implemented")
+}
 func (UnimplementedCoreServer) GenerateWarpConfig(context.Context, *GenerateWarpConfigRequest) (*WarpGenerationResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GenerateWarpConfig not implemented")
 }
@@ -456,6 +606,21 @@ func (UnimplementedCoreServer) Close(context.Context, *CloseRequest) (*hcommon.E
 }
 func (UnimplementedCoreServer) GetLANIP(context.Context, *hcommon.Empty) (*LANIPResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetLANIP not implemented")
+}
+func (UnimplementedCoreServer) IsAdmin(context.Context, *hcommon.Empty) (*IsAdminResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method IsAdmin not implemented")
+}
+func (UnimplementedCoreServer) NeedAdminBgService(context.Context, *NeedAdminBgServiceRequest) (*NeedAdminBgServiceResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method NeedAdminBgService not implemented")
+}
+func (UnimplementedCoreServer) EnsureAdminBgService(*EnsureAdminBgServiceRequest, grpc.ServerStreamingServer[EnsureAdminBgServiceEvent]) error {
+	return status.Errorf(codes.Unimplemented, "method EnsureAdminBgService not implemented")
+}
+func (UnimplementedCoreServer) ListCrashReports(context.Context, *hcommon.Empty) (*CrashReportList, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListCrashReports not implemented")
+}
+func (UnimplementedCoreServer) ExportDiagnostics(context.Context, *ExportDiagnosticsRequest) (*ExportDiagnosticsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ExportDiagnostics not implemented")
 }
 func (UnimplementedCoreServer) mustEmbedUnimplementedCoreServer() {}
 func (UnimplementedCoreServer) testEmbeddedByValue()              {}
@@ -738,6 +903,60 @@ func _Core_UrlTestActive_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Core_UploadTest_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SpeedTestRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CoreServer).UploadTest(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Core_UploadTest_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CoreServer).UploadTest(ctx, req.(*SpeedTestRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Core_DownloadTest_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SpeedTestRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CoreServer).DownloadTest(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Core_DownloadTest_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CoreServer).DownloadTest(ctx, req.(*SpeedTestRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Core_ClearSpeedTests_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(hcommon.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CoreServer).ClearSpeedTests(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Core_ClearSpeedTests_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CoreServer).ClearSpeedTests(ctx, req.(*hcommon.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Core_GenerateWarpConfig_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GenerateWarpConfigRequest)
 	if err := dec(in); err != nil {
@@ -839,6 +1058,89 @@ func _Core_GetLANIP_Handler(srv interface{}, ctx context.Context, dec func(inter
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Core_IsAdmin_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(hcommon.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CoreServer).IsAdmin(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Core_IsAdmin_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CoreServer).IsAdmin(ctx, req.(*hcommon.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Core_NeedAdminBgService_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(NeedAdminBgServiceRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CoreServer).NeedAdminBgService(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Core_NeedAdminBgService_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CoreServer).NeedAdminBgService(ctx, req.(*NeedAdminBgServiceRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Core_EnsureAdminBgService_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(EnsureAdminBgServiceRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(CoreServer).EnsureAdminBgService(m, &grpc.GenericServerStream[EnsureAdminBgServiceRequest, EnsureAdminBgServiceEvent]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Core_EnsureAdminBgServiceServer = grpc.ServerStreamingServer[EnsureAdminBgServiceEvent]
+
+func _Core_ListCrashReports_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(hcommon.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CoreServer).ListCrashReports(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Core_ListCrashReports_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CoreServer).ListCrashReports(ctx, req.(*hcommon.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Core_ExportDiagnostics_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ExportDiagnosticsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CoreServer).ExportDiagnostics(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Core_ExportDiagnostics_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CoreServer).ExportDiagnostics(ctx, req.(*ExportDiagnosticsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Core_ServiceDesc is the grpc.ServiceDesc for Core service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -895,6 +1197,18 @@ var Core_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Core_UrlTestActive_Handler,
 		},
 		{
+			MethodName: "UploadTest",
+			Handler:    _Core_UploadTest_Handler,
+		},
+		{
+			MethodName: "DownloadTest",
+			Handler:    _Core_DownloadTest_Handler,
+		},
+		{
+			MethodName: "ClearSpeedTests",
+			Handler:    _Core_ClearSpeedTests_Handler,
+		},
+		{
 			MethodName: "GenerateWarpConfig",
 			Handler:    _Core_GenerateWarpConfig_Handler,
 		},
@@ -913,6 +1227,22 @@ var Core_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetLANIP",
 			Handler:    _Core_GetLANIP_Handler,
+		},
+		{
+			MethodName: "IsAdmin",
+			Handler:    _Core_IsAdmin_Handler,
+		},
+		{
+			MethodName: "NeedAdminBgService",
+			Handler:    _Core_NeedAdminBgService_Handler,
+		},
+		{
+			MethodName: "ListCrashReports",
+			Handler:    _Core_ListCrashReports_Handler,
+		},
+		{
+			MethodName: "ExportDiagnostics",
+			Handler:    _Core_ExportDiagnostics_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{
@@ -939,6 +1269,11 @@ var Core_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "LogListener",
 			Handler:       _Core_LogListener_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "EnsureAdminBgService",
+			Handler:       _Core_EnsureAdminBgService_Handler,
 			ServerStreams: true,
 		},
 	},

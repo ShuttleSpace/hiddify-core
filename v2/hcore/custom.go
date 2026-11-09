@@ -12,10 +12,11 @@ func errorWrapper(state MessageType, err error) (*CoreInfoResponse, error) {
 }
 
 func StopAndAlert(msgType MessageType, message string) {
+	stopConnectivityWatcher()
 	SetCoreStatus(CoreStates_STOPPED, msgType, message)
 
 	if ss := static.StartedService; ss != nil {
-		ss.CloseService()
+		closeService(ss)
 		static.StartedService = nil
 	}
 }
