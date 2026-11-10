@@ -88,7 +88,14 @@ jobs:
           # - { name: 'hiddify-lib-linux-arm64-musl', os: 'ubuntu-latest', variant: 'musl', target: 'linux-arm64', naive: true ,  arch: 'arm64', corenet: 'linux/arm64', build_corenet: true }
           - { name: "hiddify-lib-windows-amd64", os: 'ubuntu-latest', target: 'windows-amd64', aarch: 'x64', naive: true, corenet: 'windows/amd64' }
           - { name: "hiddify-lib-macos", os: 'macos-15', target: 'macos'  }
-          - { name: "hiddify-lib-ios", os: "macos-15", target: "ios" }
+          # The fork's app does not build iOS (the ios platform is disabled in the
+          # app's build matrix), so the iOS library is not consumed by any fork
+          # release/download. GitHub-hosted macOS arm64 runners are capacity-
+          # constrained and routinely cancel one of the two macos-15 legs per run,
+          # so a cancelled/failed iOS leg must not block publishing the other
+          # libraries the app actually uses (macos/android/windows/linux). Keep
+          # the leg running and visible; just don't gate the release on it.
+          - { name: "hiddify-lib-ios", os: "macos-15", target: "ios", "continue-on-error": true }
           # # linux custom
           # - {name: hiddify-core-linux-amd64, goos: linux, goarch: amd64, goamd64: v1, target: 'linux-custom', os: 'ubuntu-22.04', naive: true }
           # - {name: hiddify-core-linux-amd64-v3, goos: linux, goarch: amd64, goamd64: v3, target: 'linux-custom', os: 'ubuntu-22.04', naive: true }
