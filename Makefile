@@ -246,6 +246,38 @@ linux-custom: prepare  install_cronet
 	chmod +x $(BINDIR)/$(CLINAME)
 	make webui
 
+################################
+# OpenHarmony / HarmonyOS (OHOS)
+################################
+# Builds the arm64 (aarch64) OHOS core library. OHOS is the linux/arm64 syscall
+# surface built with the OpenHarmony clang + musl sysroot; the gRPC control plane
+# is all the Flutter app needs, since it dlopens lib/hiddify-core.so through
+# CoreInterfaceDesktop (OHOS falls through to it). Naive/cronet is disabled
+# (NAIVE=0): there is no prebuilt libcronet for OHOS. Requires the OpenHarmony SDK
+# from DevEco Studio (llvm + sysroot). The standalone CLI (cmd/bydll) cross-compiles
+# because OHOS runs linux/arm64 ELF and dlopens the .so next to it at runtime.
+#   OHOS_SDK=/path/to/sdk/default/openharmony/native make ohos
+OHOS_SDK ?= /Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/native
+OHOS_CC=$(OHOS_SDK)/llvm/bin/clang
+OHOS_TARGET=aarch64-linux-ohos
+OHOS_SYSROOT=$(OHOS_SDK)/sysroot
+OHOS_CFLAGS=--target=$(OHOS_TARGET) --sysroot=$(OHOS_SYSROOT) -D__MUSL__
+OHOS_LDFLAGS=--target=$(OHOS_TARGET) --sysroot=$(OHOS_SYSROOT) -fuse-ld=lld
+
+ohos:
+	$(MAKE) NAIVE=0 ohos-build
+
+ohos-build:
+	mkdir -p $(BINDIR)/lib
+	CC="$(OHOS_CC)" CGO_CFLAGS="$(OHOS_CFLAGS)" CGO_LDFLAGS="$(OHOS_LDFLAGS)" \
+		GOOS=linux GOARCH=arm64 CGO_ENABLED=1 \
+		go build -trimpath -ldflags="-w -s -checklinkname=0 -buildid= $${CODE_VERSION} $(EMBED_LDFLAGS)" \
+		-buildmode=c-shared -tags $(TAGS) -o $(BINDIR)/lib/$(LIBNAME).so ./platform/desktop
+	@echo "OHOS core: $(BINDIR)/lib/$(LIBNAME).so"
+	@echo "Note: only the core library is built for OHOS. The Flutter app loads it directly"
+	@echo "via CoreInterfaceDesktop (OHOS falls through to it); the standalone HiddifyCli is not"
+	@echo "part of the OHOS archive because it needs a libcronet-free linux/arm64 cgo link."
+
 macos-amd64:
 	env GOOS=darwin GOARCH=amd64 CGO_CFLAGS="-mmacosx-version-min=10.11 -O2" CGO_LDFLAGS="-mmacosx-version-min=10.11 -O2 -lpthread" CGO_ENABLED=1 go build -trimpath -ldflags="$(EMBED_LDFLAGS)" -tags $(call tags,$(TAGS) $(MACOS_ADD_TAGS)) -buildmode=c-shared -o $(BINDIR)/$(LIBNAME)-amd64.dylib ./platform/desktop
 macos-arm64:
