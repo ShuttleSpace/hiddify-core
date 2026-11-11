@@ -208,7 +208,11 @@ func startServiceLocked(ctx context.Context, in *StartRequest) (coreResponse *Co
 	}
 	watch.step("saving the config")
 	ctx = libbox.FromContext(ctx, static.globalPlatformInterface)
-	if static.globalPlatformInterface != nil {
+	// OHOS injects an already-opened vNIC fd; route tun creation through the
+	// fd-injecting platform interface instead of opening /dev/net/tun.
+	if GetOhosTunFd() > 0 {
+		service.MustRegister[adapter.PlatformInterface](ctx, newOhosTunPlatformInterface())
+	} else if static.globalPlatformInterface != nil {
 		platformWrapper := libbox.WrapPlatformInterface(static.globalPlatformInterface)
 		service.MustRegister[adapter.PlatformInterface](ctx, platformWrapper)
 		// } else {
